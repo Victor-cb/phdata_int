@@ -63,7 +63,7 @@ def predict():
         prediction = model.predict(feature_df)[0] # predictions
         
         return jsonify({
-            "house_extimated_value": float(prediction),
+            "prediction": float(prediction),
             "model_version": "1.0",
             "features_used": required_features,
             "time": datetime.now()
@@ -101,7 +101,7 @@ def predict_minimal(): # Bonus
         prediction = model.predict(feature_df)[0]
         
         return jsonify({
-            "house_extimated_value" : float(prediction),
+            "prediction" : float(prediction),
             "model_version": "1.0",
             "minimal_features_used": minimal_features,
             "time": datetime.now()
