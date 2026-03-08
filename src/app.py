@@ -66,8 +66,7 @@ def predict():
             "prediction": float(prediction),
             "model_version": "1.0",
             "features_used": required_features,
-            "time": datetime.now()
-
+            "timestamp": datetime.now().isoformat()
         })
     
     except Exception as e:
@@ -101,10 +100,10 @@ def predict_minimal(): # Bonus
         prediction = model.predict(feature_df)[0]
         
         return jsonify({
-            "prediction" : float(prediction),
+            "prediction": float(prediction),
             "model_version": "1.0",
             "minimal_features_used": minimal_features,
-            "time": datetime.now()
+            "timestamp": datetime.now().isoformat()
         })
     
     except Exception as e:
