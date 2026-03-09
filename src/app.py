@@ -1,5 +1,6 @@
 import json
 import pickle
+import os
 from pathlib import Path
 from datetime import datetime
 import pandas as pd
@@ -7,34 +8,66 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-MODEL_PATH = Path("model/model.pkl")
-FEATURES_PATH = Path("model/model_features.json")
+# Configuration: Support both local and versioned deployments
+MODEL_VERSION = os.getenv('MODEL_VERSION', '1.0')
+MODEL_DIR = os.getenv('MODEL_DIR', 'model')  # Can point to different directories
+
+# Paths
 DEMOGRAPHICS_PATH = Path("data/zipcode_demographics.csv")
 
+# Global state
 model = None
 required_features = None
 demographics_df = None
+model_loaded_at = None
 
 
-def load_model_features():
-
-    global model, required_features, demographics_df
+def load_model_artifacts():
+    global model, required_features, demographics_df, model_loaded_at
     
-    with open(MODEL_PATH, 'rb') as f:
+    model_path = Path(MODEL_DIR) / "model.pkl"
+    features_path = Path(MODEL_DIR) / "model_features.json"
+    
+    print(f"Loading model version {MODEL_VERSION} from {MODEL_DIR}...")
+    
+    # Load model
+    with open(model_path, 'rb') as f:
         model = pickle.load(f)
     
-    with open(FEATURES_PATH, 'r') as f:
+    # Load features
+    with open(features_path, 'r') as f:
         required_features = json.load(f)
     
+    # Load demographics (shared across versions)
     demographics_df = pd.read_csv(DEMOGRAPHICS_PATH, dtype={'zipcode': str})
+    
+    model_loaded_at = datetime.now()
+    
 
-load_model_features()
+# Load model at startup
+load_model_artifacts()
 
 
 @app.route('/health', methods=['GET'])
 def health():
-    """Health check endpoint."""
-    return jsonify({"status": "healthy", "model_loaded": model is not None})
+    return jsonify({
+        "status": "healthy",
+        "model_loaded": model is not None,
+        "model_version": MODEL_VERSION,
+        "model_loaded_at": model_loaded_at.isoformat() if model_loaded_at else None
+    })
+
+
+@app.route('/model/info', methods=['GET'])
+def model_info():
+    return jsonify({
+        "model_version": MODEL_VERSION,
+        "model_directory": MODEL_DIR,
+        "features_count": len(required_features) if required_features else 0,
+        "features": required_features,
+        "loaded_at": model_loaded_at.isoformat() if model_loaded_at else None,
+        "demographics_zipcodes": len(demographics_df) if demographics_df is not None else 0
+    })
 
 
 @app.route('/predict', methods=['POST'])
@@ -64,7 +97,7 @@ def predict():
         
         return jsonify({
             "prediction": float(prediction),
-            "model_version": "1.0",
+            "model_version": MODEL_VERSION,
             "features_used": required_features,
             "timestamp": datetime.now().isoformat()
         })
@@ -101,7 +134,7 @@ def predict_minimal(): # Bonus
         
         return jsonify({
             "prediction": float(prediction),
-            "model_version": "1.0",
+            "model_version": MODEL_VERSION,
             "minimal_features_used": minimal_features,
             "timestamp": datetime.now().isoformat()
         })
