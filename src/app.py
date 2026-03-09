@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 # Configuration: Support both local and versioned deployments
 MODEL_VERSION = os.getenv('MODEL_VERSION', '1.0')
-MODEL_DIR = os.getenv('MODEL_DIR', 'model')  # Can point to different directories
+MODEL_DIR = os.getenv('MODEL_DIR', f'models/v{MODEL_VERSION}')  # Default: models/v1.0
 
 # Paths
 DEMOGRAPHICS_PATH = Path("data/zipcode_demographics.csv")
