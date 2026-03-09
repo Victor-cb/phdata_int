@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code and model artifacts
 COPY src/app.py .
-COPY model/ model/
+COPY models/ models/
 COPY data/zipcode_demographics.csv data/zipcode_demographics.csv
 
 # Expose port
