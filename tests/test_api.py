@@ -2,7 +2,23 @@ import json
 import requests
 import pandas as pd
 
-BASE_URL = "http://localhost"
+# BASE_URL = "http://localhost"
+import argparse
+import sys
+
+parser = argparse.ArgumentParser(description='Test ML API deployment type')
+parser.add_argument('--mode', choices=['direct', 'bluegreen'], default='direct',
+                    help='Deployment mode: direct (port 8080) or bluegreen (nginx port 80)')
+args = parser.parse_args()
+
+if args.mode == 'bluegreen':
+    BASE_URL = "http://localhost"  # nginx on port 80
+    DEPLOYMENT_NAME = "Blue-Green Deployment (nginx)"
+    print(f"\n Testing BLUE-GREEN deployment (nginx on port 80)\n")
+else:
+    BASE_URL = "http://localhost:8080"  # direct docker
+    DEPLOYMENT_NAME = "Direct Deployment"
+    print(f"\n Testing DIRECT deployment (docker on port 8080)\n")
 
 def test_health():
     response = requests.get(f"{BASE_URL}/health")
