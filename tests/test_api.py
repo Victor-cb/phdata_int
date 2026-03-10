@@ -2,7 +2,7 @@ import json
 import requests
 import pandas as pd
 
-BASE_URL = "http://localhost:8080"
+BASE_URL = "http://localhost"
 
 def test_health():
     response = requests.get(f"{BASE_URL}/health")

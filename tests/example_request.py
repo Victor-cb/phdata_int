@@ -2,7 +2,7 @@
 import requests
 import json
 
-API_URL = "http://localhost:8080"
+API_URL = "http://localhost"
 
 def example_full_prediction():
     print("Example 1: Full Prediction")
