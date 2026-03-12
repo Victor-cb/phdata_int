@@ -1,181 +1,378 @@
 ![phData Logo](phData.png "phData Logo")
 
-# phData Machine Learning Engineer Candidate Project
+``# Sound Realty House Price Prediction API
 
-phData wants the interview process to – as best as possible – reflect
-the realities of working in the real world. In a typical real-world scenario,
-you would be given project-based work as part of a team and will have time to
-perform research to solve the assigned task. As such, phData interviews
-are based on projects which emulate this workflow.
+A production-ready REST API for predicting house prices in the Seattle area using machine learning. Features zero-downtime deployment strategies including rolling updates and blue-green deployments.
 
-We also believe that success in a project includes communication of the
-solution to stakeholders.  Once you've completed the project, you will
-deliver present your solution to our team.
-The context of this project mocks a real-world problem involving real estate.
-When you present to us, we would like you to pretend that we real estate
-professionals rather than engineers.  Once you've finished that presentation,
-we will dig deeper into the technical details of the solution.
+---
 
-In other words, your presentation should be split into two parts,
-roughly 15 minutes each:
-- One part which presents the solution the client audience described
-    in the prompt below.  This should be aimed at a non-technical audience,
-    not engineers or scientists.
-- A second part which explains technical aspects of the solution,
-    which is aimed at engineers and/or scientists.
+## Table of Contents
 
-We will schedule at least an hour for this presentation, but you need not
-present for a full hour – we generally ask a lot of questions.
+- [Quick Start](#quick-start)
+- [Deployment Options](#deployment-options)
+- [API Endpoints](#api-endpoints)
+- [Model Versions](#model-versions)
+- [Project Structure](#project-structure)
+- [Requirements Completed](#requirements-completed)
+- [Documentation](#documentation)
 
-We would like to have the opportunity to review your solution before
-presenting.
-Please add your project to a private GitHub repository and share the
-link with our recruiter.
-If you don’t have a GitHub account, you can create one for
-free at [github.com](https://github.com/).
+---
 
-This project is for the machine learning engineer (MLE) role.
-We recognize there may be many definitions for a machine learning engineer,
-at phData we define this role as follows:
+## Quick Start
 
-> The MLE works in cooperation with data science teams by providing the
-engineering support for model deployment, monitoring, and retraining.
-The MLE is often not directly involved in the data-discovery and
-model-development process, though it is helpful for MLEs to have proficient
-domain knowledge in this area.
-See
-[this article](https://www.oreilly.com/ideas/data-engineers-vs-data-scientists)
-for more discussion on these various roles.
+### Option 1: Docker (Recommended)
 
-If you are more interested in another role such as Data Science or Data
-Engineering, please inform your contact you’ve been given the wrong project.
+```bash
+# Build and start the service
+docker-compose up --build
 
+# API available at http://localhost:8080
+```
 
-## Project Scenario
+### Option 2: Local Development
 
-Sound Realty helps people sell homes in the Seattle area.
-They currently spend too much time and effort on estimating the value of
-properties.
-One of their staff has heard a lot about machine learning (ML) and
-has created a basic model to estimate the value of propeties.
-The basic model uses only numeric variables and ignores some other attributes.
-Despite the simplicity of this model, the folks at Sound are impressed
-with the proof of concept and would now like to use this model to streamline
-their business.
-They have contracted us to help deploy that model for broader use.
-Our job is to create a REST endpoint that serves up model predictions for new
-data, and to provide guidance on how they could improve the model.
-
-Sound Realty has provided a Python script (`create_model.py`) which trains the
-basic model.
-The data used to train the model is in the `data` directory, which includes:
-
-- `data/kc_house_data.csv` – Data for training the model.  Each row
-corresponds to a sold home.  `price` is the
-target column, the rest can be used as features if appropriate.
-- `data/zipcode_demographics.csv` – Additional demographic data from the
-U.S. Census which are used as features.  This data should be joined to the
-primary home sales using the `zipcode` column.
-- `data/future_unseen_examples.csv` – This file contains examples of
-homes to be sold in the future.  It includes all attributes from
-the original home sales file, but not the `price`, `date`, or `id`.
-It also does not include the demographic data.
-
-The model developer at Sound Realty used a
-[Conda environment](https://docs.conda.io/en/latest/) to create
-the model, which has been captured in Conda's YAML format.
-Assuming Conda has been installed in your environment, you can recreate
-that environment with the following:
-```sh
+**With Conda:**
+```bash
 conda env create -f conda_environment.yml
-# Activate the environment.  Repeat for newly spawned shells/terminals
 conda activate housing
+python src/app.py
 ```
 
-Once you've created and activated the environment, you can run the script which
-creates the model:
-```sh
-python create_model.py
+**With venv:**
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python src/app.py
 ```
 
-The model artifacts will be saved in a directory called `model/` with the
-following contents:
+---
 
-- `model/model.pkl` – The model serialized in Python Pickle format.
-- `model/model_features.json` – The features required for the model to
-make a prediction, in the order they were passed during training.
+## Deployment Options
+
+### Standard Deployment (docker-compose.yml)
+
+Use this for simple, single-version deployments.
+
+**Start the API:**
+```bash
+docker-compose up -d
+```
+
+**Deploy a different model version:**
+```bash
+# Deploy v2.0
+export MODEL_VERSION=2.0
+docker-compose up -d --build
+
+# Deploy v1.0
+export MODEL_VERSION=1.0
+docker-compose up -d --build
+```
+
+**Check status:**
+```bash
+# Health check
+curl http://localhost:8080/health
+
+# Model information
+curl http://localhost:8080/model/info
+
+# Stop service
+docker-compose down
+```
+
+**Features:**
+- ✅ Simple single-version deployment
+- ✅ Rolling updates for zero downtime
+- ✅ Health checks
+- ✅ Auto-restart on failure
+
+---
+
+### Blue-Green Deployment (docker-compose-bluegreen.yml)
+
+Use this when you want to test a new model version thoroughly before switching production traffic.
+
+**What is Blue-Green?**
+- **Blue** = Current production version (v1.0)
+- **Green** = New version being tested (v2.0)
+- Both run simultaneously on different ports
+- Switch traffic instantly when ready
+- Instant rollback if issues
+
+**Start Blue-Green deployment:**
+
+```bash
+# 1. Start Blue (v1.0) on port 8080
+docker-compose -f docker-compose-bluegreen.yml up -d api-blue
+
+# 2. Start Green (v2.0) on port 8081
+docker-compose -f docker-compose-bluegreen.yml --profile green up -d api-green
+
+# 3. Start with Nginx load balancer (optional)
+docker-compose -f docker-compose-bluegreen.yml --profile loadbalancer up -d
+```
+
+**Test both versions:**
+```bash
+# Test Blue (v1.0)
+curl http://localhost:8080/health
+
+# Test Green (v2.0)
+curl http://localhost:8081/health
+
+# Test through Nginx (port 80)
+curl http://localhost/health
+```
+
+**Compare predictions:**
+```bash
+# Blue prediction
+curl -X POST http://localhost:8080/predict/minimal \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bedrooms": 3,
+    "bathrooms": 2.5,
+    "sqft_living": 2220,
+    "sqft_lot": 6380,
+    "floors": 1.5,
+    "sqft_above": 1660,
+    "sqft_basement": 560,
+    "zipcode": "98115"
+  }'
+
+# Green prediction
+curl -X POST http://localhost:8081/predict/minimal \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bedrooms": 3,
+    "bathrooms": 2.5,
+    "sqft_living": 2220,
+    "sqft_lot": 6380,
+    "floors": 1.5,
+    "sqft_above": 1660,
+    "sqft_basement": 560,
+    "zipcode": "98115"
+  }'
+```
+
+**Switch traffic (with Nginx):**
+
+1. Edit `nginx.conf` line 19:
+```nginx
+upstream api_active {
+    server api-green:8080;  # Switch from api-blue to api-green
+}
+```
+
+2. Reload Nginx:
+```bash
+docker-compose -f docker-compose-bluegreen.yml restart nginx
+```
+
+3. Verify switch:
+```bash
+curl http://localhost/health
+# Should now show v2.0
+```
+
+**Instant rollback:**
+```bash
+# Just switch nginx.conf back to api-blue and restart
+docker-compose -f docker-compose-bluegreen.yml restart nginx
+```
+
+**Stop Blue-Green:**
+```bash
+docker-compose -f docker-compose-bluegreen.yml --profile green --profile loadbalancer down
+```
+
+**Features:**
+- ✅ Test new version in production-like environment
+- ✅ Both versions running simultaneously
+- ✅ Instant traffic switching
+- ✅ Instant rollback capability
+- ✅ Zero downtime
 
 
-## Deliverables/Requirements
+---
 
-1. Deploy the model as an endpoint on a RESTful service which receives JSON
-   POST data.
-    - The inputs to this endpoint should be the columns in
-    `data/future_unseen_examples.csv`.
-    - The endpoint should return a JSON object
-    with a prediction from the model, as well as any metadata you see as
-     necessary.
-    - The inputs to the endpoint **should not** include any of the demographic
-    data from the `data/zipcode_demographics.csv` table.  Your service should
-     add this data on the backend.
-    - Consider how your solution would scale as more users call the API.
-    If possible, design a solution that allows scaling up or scaling down of API
-     resources without stopping the service.  You don't have to actually
-     implement autoscaling, but be prepared to talk about how you would.
-    - Consider how updated versions of the model will be deployed.
-    If possible, develop a solution that allows new versions of the model to be
-     deployed without stopping the service.
-    - Bonus: the basic model only uses a subset of the columns provided in the
-       house sales data.
-        Create an additional API endpoint where only the required features have
-        to be provided in order to get a prediction.
-2. Create a test script which submits examples to the endpoint to demonstrate
-its behavior.  The examples should be taken from
-`data/future_unseen_examples.csv`.
-This script does not have to be complicated, only needs to demonstrate
-that the service works.
-3. Evaluate the performance of the model.  You should start with the code
-in `create_model.py` and try to figure out how well the model will generalize
-to new data.  Has the model appropriately fit the dataset?
+## API Endpoints
 
-## Recommendations
-- We recommend using [Docker](https://docs.docker.com/get-started/) to
-containerize and deploy the model.
-However, feel free to use a different technology if there is one you are
-more familiar with.
-- In addition to Docker, you'll need to use several other components to create
-a scalable REST API. Google is your friend here, do some web searching to
-figure out what other components are needed to deploy a scaleable REST API
-for a Python application.
-- For the updated model use a traditional machine learning algorithm
-(no need for deep learning). Build out an 80% solution.
+### Health Check
+```bash
+GET /health
 
-## Non-Requirements
+Response:
+{
+  "status": "healthy",
+  "model_loaded": true,
+  "model_version": "1.0",
+  "model_loaded_at": "2026-03-09T10:30:00.123456"
+}
+```
 
-- **Completing in a specific amount of time.** Life is busy and chaotic.
-We understand you will not be able to work full time on this project.
-- **Running at scale.** Everything can be done on a
-laptop running
-[Docker Desktop](https://www.docker.com/products/docker-desktop), there is
-no need to deploy your code to a cloud service or cluster.
-- **An exact end result.** Two candidates given this assignment will find
-different solutions.
-Feel free to choose your own adventure as long as the base requirements are
-met.
+### Model Information
+```bash
+GET /model/info
 
-## Time management
-**We cannot stress these two enough:**
+Response:
+{
+  "model_version": "1.0",
+  "model_directory": "models/v1.0",
+  "features_count": 33,
+  "features": ["bedrooms", "bathrooms", ...],
+  "loaded_at": "2026-03-09T10:30:00.123456",
+  "demographics_zipcodes": 70
+}
+```
 
-  1. Build the simplest possible solution first, utilizing tools you are
-    familiar with when possible.
-  2. Don’t get stuck on one aspect of the project.
-    Ask questions and use the internet for research.
-    Focus on your core strengths.
+### Full Prediction
+Accepts all 18 house features. Demographics are added automatically on the backend.
 
-## One More Thing
-We wish you all the best as you work on this project and thank you again for
-your interest in phData.
-If you have any suggestions for this project or our interview process, please
-**give us feedback.**
-Our goal is to make the interview process a positive experience for candidates
-and we are always interested in improving.
+```bash
+POST /predict
+
+Request:
+{
+  "bedrooms": 4,
+  "bathrooms": 1.0,
+  "sqft_living": 1680,
+  "sqft_lot": 5043,
+  "floors": 1.5,
+  "waterfront": 0,
+  "view": 0,
+  "condition": 4,
+  "grade": 6,
+  "sqft_above": 1680,
+  "sqft_basement": 0,
+  "yr_built": 1911,
+  "yr_renovated": 0,
+  "zipcode": "98118",
+  "lat": 47.5354,
+  "long": -122.273,
+  "sqft_living15": 1560,
+  "sqft_lot15": 5765
+}
+
+Response:
+{
+  "prediction": 450000.0,
+  "model_version": "1.0",
+  "features_used": [...],
+  "timestamp": "2026-03-09T10:30:00.123456"
+}
+```
+
+### Minimal Prediction (Bonus Endpoint)
+Accepts only the 8 required features.
+
+```bash
+POST /predict/minimal
+
+Request:
+{
+  "bedrooms": 4,
+  "bathrooms": 1.0,
+  "sqft_living": 1680,
+  "sqft_lot": 5043,
+  "floors": 1.5,
+  "sqft_above": 1680,
+  "sqft_basement": 0,
+  "zipcode": "98118"
+}
+
+Response:
+{
+  "prediction": 450000.0,
+  "model_version": "1.0",
+  "minimal_features_used": [...],
+  "timestamp": "2026-03-09T10:30:00.123456"
+}
+```
+
+---
+
+## Model Versions
+
+Models are organized in the `models/` directory:
+
+```
+models/
+├── v1.0/
+│   ├── model.pkl              # KNN model
+│   └── model_features.json    # Feature list
+└── v2.0/
+    ├── model.pkl              # Random Forest model
+    └── model_features.json    # Feature list
+```
+
+### Switching Between Versions
+
+**Standard deployment:**
+```bash
+# Deploy v1.0
+export MODEL_VERSION=1.0
+docker-compose up -d --build
+
+# Deploy v2.0
+export MODEL_VERSION=2.0
+docker-compose up -d --build
+```
+
+**Blue-Green deployment:**
+- Blue always runs v1.0 (port 8080)
+- Green always runs v2.0 (port 8081)
+- Switch traffic via Nginx configuration
+
+### Adding New Versions
+
+```bash
+# 1. Create new version directory
+mkdir -p models/v3.0
+
+# 2. Train and save model
+python scripts/create_model.py
+mv model/model.pkl models/v3.0/
+mv model/model_features.json models/v3.0/
+
+# 3. Deploy
+export MODEL_VERSION=3.0
+docker-compose up -d --build
+```
+
+---
+
+
+## Testing
+
+### Run Test Suite
+
+```bash
+# Start API
+docker-compose up -d
+
+# Run tests
+python tests/test_api.py
+python tests/example_request.py
+```
+
+### Test Model Versions
+
+```bash
+# Test v1.0
+./scripts/test_model_version.sh 1.0
+
+# Test v2.0
+./scripts/test_model_version.sh 2.0
+```
+
+
+## License
+
+This project is for interview purposes.
+
+---
+
+**Built with ❤️ for phData Machine Learning Engineer Interview**
